@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MotionStation 交互拆解</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background:#f6f7fb; }
+        .card { box-shadow: 0 8px 24px rgba(15,23,42,.06); }
+        .mono { font-feature-settings: 'tnum'; font-variant-numeric: tabular-nums; }
+        .chip { border:1px solid #e5e7eb; padding:.125rem .5rem; border-radius:.375rem; font-size:.75rem; }
+        .arrow::after { content:""; position:absolute; right:-16px; top:50%; width:16px; height:2px; background:#cbd5e1; }
+        .arrow::before { content:""; position:absolute; right:-6px; top:calc(50% - 3px); width:0; height:0; border-left:6px solid #cbd5e1; border-top:6px solid transparent; border-bottom:6px solid transparent; }
+    </style>
+</head>
+<body class="min-h-screen">
+    <header class="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-slate-200">
+        <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+            <h1 class="text-xl font-bold text-slate-900">MotionStation · 交互拆解</h1>
+            <nav class="text-sm text-slate-600 space-x-4">
+                <a href="#summary" class="hover:text-slate-900">总览</a>
+                <a href="#onboarding" class="hover:text-slate-900">登录注册</a>
+                <a href="#home" class="hover:text-slate-900">首页</a>
+                <a href="#courses" class="hover:text-slate-900">课程/动作/计划</a>
+                <a href="#details" class="hover:text-slate-900">详情/日程</a>
+                <a href="#profile" class="hover:text-slate-900">我的/设置</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 py-6 space-y-10">
+        <!-- 总览 -->
+        <section id="summary" class="space-y-4">
+            <h2 class="text-lg font-semibold text-slate-900">总览</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="card bg-white rounded-xl p-4">
+                    <div class="text-slate-500 text-sm">页面数量</div>
+                    <div id="count-pages" class="text-2xl font-bold mono">-</div>
+                    <div class="mt-2 text-xs text-slate-500">包含主页面，不含抽屉/弹层</div>
+                </div>
+                <div class="card bg-white rounded-xl p-4">
+                    <div class="text-slate-500 text-sm">抽屉/弹层</div>
+                    <div id="count-overlays" class="text-2xl font-bold mono">-</div>
+                    <div class="mt-2 text-xs text-slate-500">筛选、加入日程、计划设置</div>
+                </div>
+                <div class="card bg-white rounded-xl p-4">
+                    <div class="text-slate-500 text-sm">交互关系</div>
+                    <div id="count-flows" class="text-2xl font-bold mono">-</div>
+                    <div class="mt-2 text-xs text-slate-500">页面间跳转/状态切换</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 登录注册 -->
+        <section id="onboarding" class="space-y-3">
+            <h3 class="text-base font-semibold text-slate-900">登录注册</h3>
+            <div class="grid md:grid-cols-4 gap-3">
+                <div class="card bg-white rounded-lg p-4 relative">
+                    <div class="font-medium">欢迎页</div>
+                    <div class="text-xs text-slate-500">page-welcome</div>
+                    <div class="mt-2 text-sm text-slate-700">入口：登录/注册、游客模式</div>
+                </div>
+                <div class="card bg-white rounded-lg p-4 relative arrow">
+                    <div class="font-medium">登录</div>
+                    <div class="text-xs text-slate-500">page-login</div>
+                    <ul class="mt-2 text-sm text-slate-700 list-disc list-inside">
+                        <li>手机验证码/账号密码/邮箱 Tab</li>
+                        <li>倒计时获取验证码</li>
+                    </ul>
+                </div>
+                <div class="card bg-white rounded-lg p-4">
+                    <div class="font-medium">注册</div>
+                    <div class="text-xs text-slate-500">page-register → step2 → success</div>
+                    <div class="mt-2 text-sm text-slate-700">提交信息 → 完善资料 → 2 秒后跳转首页</div>
+                </div>
+                <div class="card bg-white rounded-lg p-4">
+                    <div class="font-medium">忘记密码</div>
+                    <div class="text-xs text-slate-500">page-forgot</div>
+                    <div class="mt-2 text-sm text-slate-700">手机/邮箱重置 + 新密码确认</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 首页 -->
+        <section id="home" class="space-y-3">
+            <h3 class="text-base font-semibold text-slate-900">首页</h3>
+            <div class="card bg-white rounded-lg p-4">
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div>
+                        <div class="font-medium">页面：page-home</div>
+                        <ul class="mt-2 text-sm text-slate-700 list-disc list-inside">
+                            <li>顶部欢迎信息与日期</li>
+                            <li>数据卡片（今日时长/消耗）</li>
+                            <li>本周运动打卡（7 日）</li>
+                            <li>推荐课程 Banner（灰占位，3 张轮播）</li>
+                            <li>最新活动、我的计划区块</li>
+                            <li>底部 Tab：首页 / 课程 / 我的</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <div class="font-medium">主要交互</div>
+                        <table class="w-full text-sm text-left mt-2">
+                            <thead class="text-slate-500">
+                                <tr><th class="py-1">From</th><th class="py-1">Trigger</th><th class="py-1">To</th></tr>
+                            </thead>
+                            <tbody class="text-slate-700">
+                                <tr><td class="py-1">首页</td><td class="py-1">查看全部/加入计划</td><td class="py-1">课程库</td></tr>
+                                <tr><td class="py-1">Tab</td><td class="py-1">切换</td><td class="py-1">首页/课程/我的</td></tr>
+                                <tr><td class="py-1">头像</td><td class="py-1">点击</td><td class="py-1">我的</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 课程/动作/计划 列表与筛选 -->
+        <section id="courses" class="space-y-3">
+            <h3 class="text-base font-semibold text-slate-900">课程 / 动作 / 计划</h3>
+            <div class="grid md:grid-cols-2 gap-3">
+                <div class="card bg-white rounded-lg p-4">
+                    <div class="font-medium">课程库（page-course）</div>
+                    <ul class="mt-2 text-sm text-slate-700 list-disc list-inside">
+                        <li>搜索框 + Banner（灰占位）</li>
+                        <li>分类 Tab：课程 / 动作 / 计划 / 收藏</li>
+                        <li>右侧“筛选”打开底部抽屉</li>
+                        <li>三套列表示例卡片（课程、动作、计划）</li>
+                    </ul>
+                </div>
+                <div class="card bg-white rounded-lg p-4">
+                    <div class="font-medium">筛选抽屉（drawer-filter）</div>
+                    <ul class="mt-2 text-sm text-slate-700 list-disc list-inside">
+                        <li>跟随 Tab 渲染不同维度（类型/难度/配件等）</li>
+                        <li>底部“重置/确定”，自下而上弹入</li>
+                        <li>限高可滚动（长内容）</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="card bg-white rounded-lg p-4">
+                <div class="font-medium mb-2">交互流</div>
+                <table class="w-full text-sm text-left">
+                    <thead class="text-slate-500">
+                        <tr><th class="py-1">From</th><th class="py-1">Trigger</th><th class="py-1">To</th><th class="py-1">说明</th></tr>
+                    </thead>
+                    <tbody class="text-slate-700">
+                        <tr><td class="py-1">首页</td><td class="py-1">查看全部/加入计划</td><td class="py-1">课程库</td><td class="py-1">setActiveTab('course')</td></tr>
+                        <tr><td class="py-1">课程库</td><td class="py-1">点击卡片</td><td class="py-1">详情页</td><td class="py-1">openCourseDetail / openActionDetail / openPlanDetail</td></tr>
+                        <tr><td class="py-1">课程库</td><td class="py-1">筛选</td><td class="py-1">筛选抽屉</td><td class="py-1">toggleFilterDrawer(true)</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 详情与日程 -->
+        <section id="details" class="space-y-3">
+            <h3 class="text-base font-semibold text-slate-900">详情 / 日程</h3>
+            <div class="grid md:grid-cols-3 gap-3">
+                <div class="card bg-white rounded-lg p-4">
+                    <div class="font-medium">课程详情</div>
+                    <div class="text-xs text-slate-500">page-course-detail</div>
+                    <ul class="mt-2 text-sm text-slate-700 list-disc list-inside">
+                        <li>头图、标签、时长/容量/消耗</li>
+                        <li>器械、动作介绍、训练部位</li>
+                        <li>训练安排列表</li>
+                        <li>加入日程（底部按钮）</li>
+                    </ul>
+                </div>
+                <div class="card bg-white rounded-lg p-4">
+                    <div class="font-medium">动作详情 / 计划详情</div>
+                    <div class="text-xs text-slate-500">page-action-detail / page-plan-detail</div>
+                    <ul class="mt-2 text-sm text-slate-700 list-disc list-inside">
+                        <li>动作：错误要点、呼吸建议、安装示意</li>
+                        <li>计划：按周安排（第1周 1-7天示例）</li>
+                        <li>右上收藏，Toast 提示</li>
+                    </ul>
+                </div>
+                <div class="card bg-white rounded-lg p-4">
+                    <div class="font-medium">弹层</div>
+                    <div class="text-xs text-slate-500">overlay-schedule / overlay-plan-setup</div>
+                    <ul class="mt-2 text-sm text-slate-700 list-disc list-inside">
+                        <li>加入日程：当月日历选择 + 确认</li>
+                        <li>计划设置：开始时间、每周训练日</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- 我的与设置 -->
+        <section id="profile" class="space-y-3">
+            <h3 class="text-base font-semibold text-slate-900">我的 / 设置</h3>
+            <div class="grid md:grid-cols-3 gap-3">
+                <div class="card bg-white rounded-lg p-4">
+                    <div class="font-medium">我的</div>
+                    <div class="text-xs text-slate-500">page-me</div>
+                    <ul class="mt-2 text-sm text-slate-700 list-disc list-inside">
+                        <li>打卡、近 7 日数据</li>
+                        <li>快捷入口：收藏/计划/训练/成就</li>
+                        <li>头像/昵称进入个人资料</li>
+                    </ul>
+                </div>
+                <div class="card bg-white rounded-lg p-4">
+                    <div class="font-medium">设置 / 其他设置</div>
+                    <div class="text-xs text-slate-500">page-settings / page-settings-others</div>
+                    <ul class="mt-2 text-sm text-slate-700 list-disc list-inside">
+                        <li>语言切换、退出登录</li>
+                        <li>清除缓存、出厂、版本/固件检查</li>
+                    </ul>
+                </div>
+                <div class="card bg-white rounded-lg p-4">
+                    <div class="font-medium">个人资料</div>
+                    <div class="text-xs text-slate-500">page-profile</div>
+                    <ul class="mt-2 text-sm text-slate-700 list-disc list-inside">
+                        <li>编辑：昵称/性别/身高/年龄/体重/HRmax</li>
+                        <li>保存返回我的，Toast 提示</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- 交互矩阵 -->
+        <section id="flows" class="space-y-3">
+            <h3 class="text-base font-semibold text-slate-900">交互矩阵</h3>
+            <div class="card bg-white rounded-lg p-4 overflow-x-auto">
+                <table class="w-full text-sm text-left" id="flows-table"></table>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // 数据定义（同步当前 demo）
+        const pages = [
+            { id:'page-welcome', name:'欢迎页', scene:'onboarding' },
+            { id:'page-login', name:'登录', scene:'onboarding' },
+            { id:'page-register', name:'注册 Step1', scene:'onboarding' },
+            { id:'page-register-step2', name:'注册 Step2', scene:'onboarding' },
+            { id:'page-register-success', name:'注册成功', scene:'onboarding' },
+            { id:'page-forgot', name:'忘记密码', scene:'onboarding' },
+            { id:'page-home', name:'首页', scene:'home' },
+            { id:'page-course', name:'课程库', scene:'courses' },
+            { id:'page-course-detail', name:'课程详情', scene:'details' },
+            { id:'page-action-detail', name:'动作详情', scene:'details' },
+            { id:'page-plan-detail', name:'计划详情', scene:'details' },
+            { id:'page-me', name:'我的', scene:'profile' },
+            { id:'page-settings', name:'设置', scene:'profile' },
+            { id:'page-settings-others', name:'其他设置', scene:'profile' },
+            { id:'page-profile', name:'个人资料', scene:'profile' }
+        ];
+        const overlays = [
+            { id:'drawer-filter', name:'筛选抽屉' },
+            { id:'overlay-schedule', name:'加入日程' },
+            { id:'overlay-plan-setup', name:'计划设置' }
+        ];
+        const flows = [
+            { from:'欢迎页', action:'登录/注册', to:'登录 / 注册流程' },
+            { from:'登录', action:'成功', to:'首页' },
+            { from:'注册成功', action:'2s 自动跳转', to:'首页' },
+            { from:'首页', action:'查看全部/加入计划', to:'课程库' },
+            { from:'课程库', action:'Tab 切换', to:'课程/动作/计划/收藏' },
+            { from:'课程库', action:'筛选', to:'筛选抽屉' },
+            { from:'课程库', action:'点击课程卡片', to:'课程详情' },
+            { from:'课程库', action:'点击动作卡片', to:'动作详情' },
+            { from:'课程库', action:'点击计划卡片', to:'计划详情' },
+            { from:'课程详情', action:'加入日程', to:'加入日程弹层' },
+            { from:'计划详情', action:'加入计划', to:'计划设置弹层' },
+            { from:'我的', action:'头像/昵称', to:'个人资料' },
+            { from:'我的', action:'收藏/计划/训练入口', to:'课程库-对应 Tab' },
+            { from:'设置', action:'其他设置', to:'其他设置' }
+        ];
+
+        // 渲染统计
+        document.getElementById('count-pages').textContent = pages.length;
+        document.getElementById('count-overlays').textContent = overlays.length;
+        document.getElementById('count-flows').textContent = flows.length;
+
+        // 渲染交互矩阵
+        const flowsTable = document.getElementById('flows-table');
+        flowsTable.innerHTML = `
+            <thead class="text-slate-500"><tr>
+                <th class="py-2 pr-4">From</th>
+                <th class="py-2 pr-4">触发</th>
+                <th class="py-2">To</th>
+            </tr></thead>
+            <tbody class="text-slate-700">
+                ${flows.map(f=>`<tr>
+                    <td class=\"py-1 pr-4\">${f.from}</td>
+                    <td class=\"py-1 pr-4\">${f.action}</td>
+                    <td class=\"py-1\">${f.to}</td>
+                </tr>`).join('')}
+            </tbody>`;
+    </script>
+</body>
+</html>
+
+
