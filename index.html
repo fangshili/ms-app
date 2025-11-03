@@ -335,32 +335,11 @@
                             </div>
                         </div>
                         
-                        <!-- 快捷入口 -->
-                        <div class="grid grid-cols-4 gap-4 text-center mt-6">
-                            <a href="#" class="text-gray-700">
-                                <div class="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
-                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                                </div>
-                                <span class="text-xs font-medium mt-2 block">日历</span>
-                            </a>
-                            <a href="#" class="text-gray-700">
-                                <div class="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
-                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341A6.002 6.002 0 006 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
-                                </div>
-                                <span class="text-xs font-medium mt-2 block">消息</span>
-                            </a>
-                            <a href="#" class="text-gray-700">
-                                <div class="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
-                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4 2 2 0 000-4zm0 0a2 2 0 110 4 2 2 0 010-4zm0 0a2 2 0 100 4 2 2 0 000-4zm0 0a2 2 0 110 4 2 2 0 010-4zM6 18v-2m0 2a2 2 0 100-4 2 2 0 000 4zm0 0a2 2 0 110-4 2 2 0 010 4zm0 0a2 2 0 100-4 2 2 0 000 4zm0 0a2 2 0 110-4 2 2 0 010-4zm6-6v-2m0 2a2 2 0 100-4 2 2 0 000 4zm0 0a2 2 0 110-4 2 2 0 010 4zm0 0a2 2 0 100-4 2 2 0 000 4zm0 0a2 2 0 110-4 2 2 0 010-4zm6 6v-2m0 2a2 2 0 100-4 2 2 0 000 4zm0 0a2 2 0 110-4 2 2 0 010 4zm0 0a2 2 0 100-4 2 2 0 000 4zm0 0a2 2 0 110-4 2 2 0 010-4z"></path></svg>
-                                </div>
-                                <span class="text-xs font-medium mt-2 block">设置</span>
-                            </a>
-                            <a href="#" class="text-gray-700">
-                                <div class="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
-                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.79 4 4s-1.79 4-4 4c-1.742 0-3.223-.835-3.772-2"></path></svg>
-                                </div>
-                                <span class="text-xs font-medium mt-2 block">其它</span>
-                            </a>
+                        <!-- 快捷入口移除（改为打卡模块） -->
+                        <!-- 本周运动打卡（动态生成：已打卡/未打卡/今天） -->
+                        <div class="mt-6">
+                            <div class="text-sm text-gray-500 mb-2">本周运动打卡</div>
+                            <div id="weekly-checkins-home" class="flex space-x-2"></div>
                         </div>
                     </div>
                     
@@ -444,6 +423,18 @@
                     <div class="flex items-center space-x-2">
                         <div class="flex-1">
                             <input type="search" placeholder="搜索课程/计划/动作" class="w-full p-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        </div>
+                    </div>
+                    <!-- 轮播 Banner -->
+                    <div class="mt-3 h-28 rounded-xl slider-container relative shadow">
+                        <div class="course-slide active h-28">
+                            <img src="https://placehold.co/600x300/bae6fd/0c4a6e?text=最新课程推荐" class="w-full h-full object-cover rounded-xl">
+                        </div>
+                        <div class="course-slide h-28">
+                            <img src="https://placehold.co/600x300/fecaca/7f1d1d?text=热门训练计划" class="w-full h-full object-cover rounded-xl">
+                        </div>
+                        <div class="course-slide h-28">
+                            <img src="https://placehold.co/600x300/d9f99d/14532d?text=动作教学精选" class="w-full h-full object-cover rounded-xl">
                         </div>
                     </div>
                     <div class="mt-3 grid grid-cols-4 text-center text-sm font-medium">
@@ -894,6 +885,60 @@
             </div>
 
             <!-- ======================= -->
+            <!-- 页面：个人资料 -->
+            <!-- ======================= -->
+            <div id="page-profile" class="page flex-col h-full">
+                <div class="flex-shrink-0 h-12 bg-white border-b border-gray-100 flex items-center px-4">
+                    <svg onclick="showPage('page-me')" class="w-6 h-6 text-gray-500 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                    <div class="ml-2 font-bold text-gray-900">个人资料</div>
+                </div>
+                <div class="flex-1 overflow-y-auto p-6 space-y-6">
+                    <div class="flex flex-col items-center">
+                        <img src="https://placehold.co/96x96/E2E8F0/94A3B8?text=U" class="w-24 h-24 rounded-full">
+                        <div class="text-sm text-gray-500 mt-2">当前登录用户</div>
+                        <div class="text-lg font-bold text-gray-900 mt-1">已训练xxx天</div>
+                    </div>
+
+                    <div>
+                        <div class="text-sm text-gray-500 mb-2">个人信息</div>
+                        <div class="space-y-3">
+                            <label class="block">
+                                <div class="text-sm text-gray-600 mb-1">昵称</div>
+                                <input id="pf-nickname" type="text" class="w-full p-3 bg-gray-100 rounded-lg" placeholder="请输入昵称" value="Jack">
+                            </label>
+                            <label class="block">
+                                <div class="text-sm text-gray-600 mb-1">性别</div>
+                                <select id="pf-gender" class="w-full p-3 bg-gray-100 rounded-lg">
+                                    <option>男</option>
+                                    <option>女</option>
+                                </select>
+                            </label>
+                            <label class="block">
+                                <div class="text-sm text-gray-600 mb-1">身高 (cm)</div>
+                                <input id="pf-height" type="number" class="w-full p-3 bg-gray-100 rounded-lg" placeholder="175" value="175">
+                            </label>
+                            <label class="block">
+                                <div class="text-sm text-gray-600 mb-1">年龄</div>
+                                <input id="pf-age" type="number" class="w-full p-3 bg-gray-100 rounded-lg" placeholder="30" value="30">
+                            </label>
+                            <label class="block">
+                                <div class="text-sm text-gray-600 mb-1">体重 (kg)</div>
+                                <input id="pf-weight" type="number" class="w-full p-3 bg-gray-100 rounded-lg" placeholder="70" value="70">
+                            </label>
+                            <label class="block">
+                                <div class="text-sm text-gray-600 mb-1">最大心率</div>
+                                <input id="pf-hrmax" type="number" class="w-full p-3 bg-gray-100 rounded-lg" placeholder="190" value="190">
+                            </label>
+                        </div>
+                    </div>
+
+                </div>
+                <div class="flex-shrink-0 p-4 bg-white border-t">
+                    <button onclick="saveProfile()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg">保存</button>
+                </div>
+            </div>
+
+            <!-- ======================= -->
             <!-- 页面：其他设置 -->
             <!-- ======================= -->
             <div id="page-settings-others" class="page flex-col h-full">
@@ -977,8 +1022,9 @@
             <div id="page-me" class="page flex-col h-full">
                 <!-- 顶部信息 -->
                 <div class="flex-shrink-0 p-6 bg-white border-b border-gray-100 flex items-center">
-                    <img src="https://placehold.co/64x64/E2E8F0/94A3B8?text=U" class="w-16 h-16 rounded-full">
-                    <div class="ml-4">
+                    <svg onclick="setActiveTab('home')" class="w-6 h-6 text-gray-500 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                    <img src="https://placehold.co/64x64/E2E8F0/94A3B8?text=U" class="w-16 h-16 rounded-full ml-3 cursor-pointer" onclick="openProfile()">
+                    <div class="ml-4 cursor-pointer" onclick="openProfile()">
                         <div class="text-lg font-bold text-gray-900">当前登录用户</div>
                         <div class="text-sm text-gray-500">已训练xxx天</div>
                     </div>
@@ -1005,15 +1051,15 @@
                         <div class="grid grid-cols-3 gap-3">
                             <div class="bg-white rounded-xl p-4 border text-center">
                                 <div class="text-xs text-gray-500">运动时长</div>
-                                <div class="text-lg font-bold text-gray-900 mt-1">3h24min</div>
+                        <div class="text-base font-bold text-gray-900 mt-1">3h24min</div>
                             </div>
                             <div class="bg-white rounded-xl p-4 border text-center">
                                 <div class="text-xs text-gray-500">运动容量</div>
-                                <div class="text-lg font-bold text-gray-900 mt-1">1500kg</div>
+                        <div class="text-base font-bold text-gray-900 mt-1">1500kg</div>
                             </div>
                             <div class="bg-white rounded-xl p-4 border text-center">
                                 <div class="text-xs text-gray-500">运动消耗</div>
-                                <div class="text-lg font-bold text-gray-900 mt-1">1500kcal</div>
+                        <div class="text-base font-bold text-gray-900 mt-1">1500kcal</div>
                             </div>
                         </div>
 
@@ -1038,13 +1084,6 @@
                                     <div class="text-xs">我的成就</div>
                                 </button>
                             </div>
-                        </div>
-
-                        <!-- 其它入口 -->
-                        <div class="space-y-3">
-                            <button class="w-full text-left p-4 bg-gray-100 rounded-lg font-medium text-gray-700">账号管理（开发中）</button>
-                            <button class="w-full text-left p-4 bg-gray-100 rounded-lg font-medium text-gray-700">配件设置（开发中）</button>
-                            <button class="w-full text-left p-4 bg-gray-100 rounded-lg font-medium text-gray-700" onclick="showPage('page-settings')">设置</button>
                         </div>
 
                         <button onclick="logout()" class="w-full bg-red-500 text-white font-bold py-3 px-4 rounded-lg shadow-lg hover:bg-red-600 transition duration-300">退出登录</button>
@@ -1090,10 +1129,15 @@
                 // 特殊逻辑: 进入首页时启动轮播
                 if (pageId === 'page-home') {
                     startSlider();
+                } else if (pageId === 'page-course') {
+                    startCourseSlider();
                 } else {
                     // 离开首页时停止轮播
                     if (sliderInterval) {
                         clearInterval(sliderInterval);
+                    }
+                    if (courseSliderInterval) {
+                        clearInterval(courseSliderInterval);
                     }
                 }
             }
@@ -1297,10 +1341,14 @@
         
         // *** 新增：轮播图逻辑 ***
         let slideIndex = 0;
+        let courseSlideIndex = 0;
+        let courseSliderInterval;
         function startSlider() {
             if (sliderInterval) {
                 clearInterval(sliderInterval);
             }
+            // 渲染首页本周打卡
+            renderWeeklyCheckins('weekly-checkins-home');
             slideIndex = 0; // 重置索引，进入首页时从第一张开始
             showSlides();
             sliderInterval = setInterval(showSlides, 3000); // 每3秒切换一次
@@ -1325,6 +1373,24 @@
             slides[slideIndex - 1].classList.add('active');
         }
         // *** 结束新增 ***
+
+        // 课程页轮播
+        function startCourseSlider() {
+            if (courseSliderInterval) {
+                clearInterval(courseSliderInterval);
+            }
+            courseSlideIndex = 0;
+            showCourseSlides();
+            courseSliderInterval = setInterval(showCourseSlides, 3000);
+        }
+        function showCourseSlides() {
+            const slides = document.querySelectorAll('.course-slide');
+            if (slides.length === 0) return;
+            slides.forEach(s => s.classList.remove('active'));
+            courseSlideIndex++;
+            if (courseSlideIndex > slides.length) courseSlideIndex = 1;
+            slides[courseSlideIndex - 1].classList.add('active');
+        }
 
         // 页面加载完毕后，默认显示欢迎页
         document.addEventListener('DOMContentLoaded', () => {
@@ -1351,6 +1417,10 @@
                     checkIcon.classList.toggle('hidden', !input.checked);
                 }
             });
+            // 渲染首页本周打卡
+            if (typeof renderWeeklyCheckins === 'function') {
+                renderWeeklyCheckins('weekly-checkins-home');
+            }
         });
 
         // ==========================
@@ -1578,6 +1648,52 @@
         }
         function checkUpdate() { showToast('已是最新版本'); }
         function checkFirmware() { showToast('已是最新固件'); }
+
+        // 生成本周运动打卡（区分：已打卡/未打卡/今天）
+        function renderWeeklyCheckins(targetId) {
+            const container = document.getElementById(targetId);
+            if (!container) return;
+            container.innerHTML = '';
+            const now = new Date();
+            const todayStr = now.toDateString();
+            // 以周一为一周开始
+            const weekday = (now.getDay() + 6) % 7; // 周一=0
+            const monday = new Date(now);
+            monday.setDate(now.getDate() - weekday);
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(monday);
+                d.setDate(monday.getDate() + i);
+                const span = document.createElement('span');
+                span.textContent = d.getDate();
+                span.className = 'w-9 h-9 rounded-full text-xs flex items-center justify-center font-medium transition';
+                if (d.toDateString() === todayStr) {
+                    // 今天
+                    span.className += ' bg-white text-blue-700 border border-blue-600 ring-4 ring-blue-100 shadow';
+                } else if (d < now) {
+                    // 已打卡（示意：过去的天数）
+                    span.className += ' bg-blue-600 text-white shadow ring-4 ring-blue-100';
+                } else {
+                    // 未打卡（未来）
+                    span.className += ' bg-blue-50 text-blue-700';
+                }
+                container.appendChild(span);
+            }
+        }
+
+        // 个人资料
+        function openProfile() {
+            showPage('page-profile');
+        }
+        function saveProfile() {
+            // 简单校验示例
+            const nickname = document.getElementById('pf-nickname').value.trim();
+            if (!nickname) {
+                showToast('请填写昵称');
+                return;
+            }
+            showToast('资料已保存');
+            showPage('page-me');
+        }
 
     </script>
 </body>
