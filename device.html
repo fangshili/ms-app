@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MotionStation 设备端原型</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --device-brightness: 1; /* 0 ~ 1 */
+        }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+            background: #0b1220; /* 深色背景，突出屏幕 */
+        }
+        /* 屏幕容器：保持 9:16 纵向比例（16:9 竖放） */
+        .device-shell {
+            position: relative;
+            background: #111827;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5), inset 0 0 0 8px #111;
+            overflow: hidden;
+            width: min(90vh*9/16, 87vw); /* 放大 50% */
+            height: calc(min(90vh, 87vw*16/9));
+            margin: 24px auto;
+        }
+        /* 亮度遮罩：依据 --device-brightness 反向调整 */
+        .brightness-overlay {
+            pointer-events: none;
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,calc(1 - var(--device-brightness)));
+            transition: background 120ms linear;
+            z-index: 5;
+        }
+        /* 页面切换动画 */
+        .page { display: none; animation: fadeIn 200ms ease; }
+        .page.active { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px);} to { opacity:1; transform: translateY(0);} }
+
+        /* 顶部下拉手势命中区域 */
+        .gesture-pull-down { position: absolute; inset: 0 0 auto 0; height: 32px; z-index: 40; }
+
+        /* 控制中心抽屉 */
+        .control-center { position: absolute; left: 0; right: 0; top: -70%; height: 70%; z-index: 50; }
+        .control-center.open { top: 0; }
+        .transition-fast { transition: top 220ms cubic-bezier(.2,.8,.2,1); }
+
+        /* 自定义隐藏输入的选中效果 */
+        .hidden-input { opacity: 0; position: absolute; width: 0; height: 0; }
+        .hidden-input:checked + div { border-color: #2563eb; background: #eff6ff; color: #1d4ed8; }
+
+        /* 滚动条微样式（仅屏幕内部） */
+        .screen-scroll::-webkit-scrollbar { width: 6px; }
+        .screen-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <!-- 设备屏幕（9:16 竖屏） -->
+    <div id="device" class="device-shell">
+
+        <!-- 手势命中区（从顶端下拉） -->
+        <div id="gestureArea" class="gesture-pull-down"></div>
+
+        <!-- 屏幕内容 -->
+        <div class="absolute inset-0 bg-white flex flex-col">
+
+            <!-- 顶部状态栏（设备端简化） -->
+            <div class="flex-shrink-0 h-10 bg-white/90 backdrop-blur flex items-center justify-between px-4 border-b border-gray-100">
+                <div class="flex items-center gap-2 text-gray-600">
+                    <span class="text-sm font-semibold">09:41</span>
+                    <span class="text-xs">MotionStation</span>
+                </div>
+                <button id="btnOpenCC" class="text-xs px-2 py-1 rounded border text-gray-600 hover:bg-gray-50">下拉控制中心</button>
+            </div>
+
+            <!-- 屏幕主内容（页面栈） -->
+            <div class="flex-1 overflow-y-auto screen-scroll relative">
+
+                <!-- 欢迎页（设备端） -->
+                <div id="page-welcome" class="page active flex-col items-center justify-between p-10 h-full bg-white">
+                    <div class="flex-1 flex items-center justify-center">
+                        <div class="w-80 h-80 bg-gray-100 rounded-2xl flex items-center justify-center">
+                            <span class="text-gray-400 text-xl">欢迎使用 MotionStation</span>
+                        </div>
+                    </div>
+                    <div class="w-full max-w-md">
+                        <button onclick="showPage('page-login')" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg shadow hover:bg-blue-700">登录 / 注册</button>
+                        <button onclick="showPage('page-guest')" class="w-full text-gray-600 font-medium py-3 rounded-lg mt-3 hover:bg-gray-100">游客模式</button>
+                        <div class="text-center text-xs text-gray-400 mt-4">切换地区</div>
+                    </div>
+                </div>
+
+                <!-- 登录页 -->
+                <div id="page-login" class="page flex-col p-8 h-full bg-white">
+                    <h1 class="text-3xl font-bold text-gray-900 mt-4">欢迎回来!</h1>
+                    <div class="my-6 flex border border-gray-200 rounded-lg overflow-hidden max-w-xl">
+                        <button id="tab-btn-phone" onclick="toggleLoginMode('phone')" class="flex-1 py-2 text-sm font-medium bg-blue-600 text-white">手机验证码</button>
+                        <button id="tab-btn-password" onclick="toggleLoginMode('password')" class="flex-1 py-2 text-sm font-medium text-gray-600 bg-gray-50 hover:bg-gray-100">账号密码</button>
+                        <button id="tab-btn-email" onclick="toggleLoginMode('email')" class="flex-1 py-2 text-sm font-medium text-gray-600 bg-gray-50 hover:bg-gray-100">邮箱</button>
+                    </div>
+                    <div id="mode-phone" class="space-y-4 max-w-xl">
+                        <input type="tel" placeholder="请输入手机号" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <div class="flex gap-2">
+                            <input type="text" placeholder="请输入验证码" class="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <button onclick="startCountdown(this)" class="w-40 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300">获取验证码</button>
+                        </div>
+                    </div>
+                    <div id="mode-password" class="space-y-4 max-w-xl hidden">
+                        <input type="text" placeholder="请输入手机号/邮箱" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="password" placeholder="请输入密码" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div id="mode-email" class="space-y-4 max-w-xl hidden">
+                        <input type="email" placeholder="请输入邮箱" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <div class="flex gap-2">
+                            <input type="text" placeholder="请输入验证码" class="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <button onclick="startCountdown(this)" class="w-40 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300">获取验证码</button>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center mt-4 max-w-xl">
+                        <a onclick="showPage('page-forgot')" class="text-sm text-blue-600 hover:underline cursor-pointer">忘记密码?</a>
+                        <a onclick="showPage('page-register')" class="text-sm text-blue-600 hover:underline cursor-pointer">立即注册</a>
+                    </div>
+                    <button onclick="login()" class="w-full max-w-xl bg-blue-600 text-white font-bold py-3 rounded-lg shadow mt-8 hover:bg-blue-700">登录</button>
+                    <div class="mt-6 flex items-center max-w-xl">
+                        <input type="checkbox" id="agree-login" class="hidden-input">
+                        <label for="agree-login" class="flex items-center cursor-pointer">
+                            <div class="w-4 h-4 border-2 border-gray-300 rounded-sm flex-shrink-0 mr-2 flex items-center justify-center">
+                                <svg class="w-3 h-3 text-blue-600 hidden" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                            </div>
+                            <span class="text-xs text-gray-500">我已阅读并同意 <a class="text-blue-600">用户协议</a> 和 <a class="text-blue-600">隐私政策</a></span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 注册 步骤1 -->
+                <div id="page-register" class="page flex-col p-8 h-full bg-white">
+                    <svg onclick="showPage('page-login')" class="w-6 h-6 text-gray-500 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                    <h1 class="text-3xl font-bold text-gray-900 mt-4">创建账号</h1>
+                    <div class="my-6 flex border border-gray-200 rounded-lg overflow-hidden max-w-xl">
+                        <button id="tab-btn-reg-phone" onclick="toggleRegisterMode('phone')" class="flex-1 py-2 text-sm font-medium bg-blue-600 text-white">手机注册</button>
+                        <button id="tab-btn-reg-email" onclick="toggleRegisterMode('email')" class="flex-1 py-2 text-sm font-medium text-gray-600 bg-gray-50 hover:bg-gray-100">邮箱注册</button>
+                    </div>
+                    <div id="reg-mode-phone" class="space-y-4 max-w-xl">
+                        <div class="flex">
+                            <span class="inline-flex items-center px-3 text-sm text-gray-900 bg-gray-100 border border-r-0 border-gray-300 rounded-l-md">+86</span>
+                            <input type="tel" placeholder="请输入手机号" class="flex-1 p-3 border border-gray-300 rounded-r-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div class="flex gap-2">
+                            <input type="text" placeholder="请输入验证码" class="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <button onclick="startCountdown(this)" class="w-40 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300">获取验证码</button>
+                        </div>
+                        <input type="password" placeholder="设置密码 (6-20位)" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div id="reg-mode-email" class="space-y-4 max-w-xl hidden">
+                        <input type="email" placeholder="请输入邮箱" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <div class="flex gap-2">
+                            <input type="text" placeholder="请输入验证码" class="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <button onclick="startCountdown(this)" class="w-40 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300">获取验证码</button>
+                        </div>
+                        <input type="password" placeholder="设置密码 (6-20位)" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="mt-6 flex items-center max-w-xl">
+                        <input type="checkbox" id="agree-register" class="hidden-input">
+                        <label for="agree-register" class="flex items-center cursor-pointer">
+                            <div class="w-4 h-4 border-2 border-gray-300 rounded-sm flex-shrink-0 mr-2 flex items-center justify-center">
+                                <svg class="w-3 h-3 text-blue-600 hidden" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                            </div>
+                            <span class="text-xs text-gray-500">我已阅读并同意 <a class="text-blue-600">用户协议</a> 和 <a class="text-blue-600">隐私政策</a></span>
+                        </label>
+                    </div>
+                    <button onclick="registerStep1()" class="w-full max-w-xl bg-blue-600 text-white font-bold py-3 rounded-lg shadow mt-8 hover:bg-blue-700">下一步</button>
+                </div>
+
+                <!-- 注册 步骤2 -->
+                <div id="page-register-step2" class="page flex-col p-8 h-full bg-white">
+                    <svg onclick="showPage('page-register')" class="w-6 h-6 text-gray-500 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                    <h1 class="text-3xl font-bold text-gray-900 mt-4">完善个人资料</h1>
+                    <div class="space-y-4 mt-6 max-w-xl">
+                        <label class="block">
+                            <span class="text-gray-700 font-medium">昵称</span>
+                            <input type="text" placeholder="请输入昵称" class="w-full mt-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </label>
+                        <label class="block">
+                            <span class="text-gray-700 font-medium">性别</span>
+                            <div class="flex gap-4 mt-2">
+                                <label class="flex-1"><input type="radio" name="gender" class="hidden-input" checked><div class="w-full text-center p-3 border-2 border-gray-300 rounded-lg">男</div></label>
+                                <label class="flex-1"><input type="radio" name="gender" class="hidden-input"><div class="w-full text-center p-3 border-2 border-gray-300 rounded-lg">女</div></label>
+                            </div>
+                        </label>
+                        <label class="block">
+                            <span class="text-gray-700 font-medium">生日</span>
+                            <input type="date" class="w-full mt-1 p-3 border border-gray-300 rounded-lg text-gray-500">
+                        </label>
+                        <label class="block">
+                            <span class="text-gray-700 font-medium">身高 (cm)</span>
+                            <input type="number" placeholder="175" class="w-full mt-1 p-3 border border-gray-300 rounded-lg">
+                        </label>
+                        <label class="block">
+                            <span class="text-gray-700 font-medium">体重 (kg)</span>
+                            <input type="number" placeholder="70" class="w-full mt-1 p-3 border border-gray-300 rounded-lg">
+                        </label>
+                        <label class="block">
+                            <span class="text-gray-700 font-medium">训练目的 (多选)</span>
+                            <div class="grid grid-cols-2 gap-3 mt-2">
+                                <label><input type="checkbox" class="hidden-input"><div class="w-full text-center p-3 border-2 border-gray-300 rounded-lg">塑形减脂</div></label>
+                                <label><input type="checkbox" class="hidden-input"><div class="w-full text-center p-3 border-2 border-gray-300 rounded-lg">力量增肌</div></label>
+                                <label><input type="checkbox" class="hidden-input"><div class="w-full text-center p-3 border-2 border-gray-300 rounded-lg">运动康复</div></label>
+                                <label><input type="checkbox" class="hidden-input"><div class="w-full text-center p-3 border-2 border-gray-300 rounded-lg">普拉提</div></label>
+                            </div>
+                        </label>
+                    </div>
+                    <button onclick="registerStep2()" class="w-full max-w-xl bg-blue-600 text-white font-bold py-3 rounded-lg shadow mt-8 hover:bg-blue-700">完成</button>
+                </div>
+
+                <!-- 注册成功 -->
+                <div id="page-register-success" class="page flex-col h-full items-center justify-center bg-white">
+                    <div class="w-32 h-32 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
+                        <svg class="w-20 h-20 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    </div>
+                    <h1 class="text-2xl font-bold text-gray-900 mt-6">注册成功!</h1>
+                    <p class="text-gray-500 mt-2">即将跳转至首页...</p>
+                </div>
+
+                <!-- 首页（登录后） -->
+                <div id="page-home" class="page flex-col h-full bg-white">
+                    <div class="p-8 border-b bg-white">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h2 class="text-xl font-bold text-gray-900">欢迎回来, 用户</h2>
+                                <p class="text-sm text-gray-500" id="home-date"></p>
+                            </div>
+                            <div class="w-10 h-10 bg-gray-100 rounded-full"></div>
+                        </div>
+                        <div class="mt-6 bg-blue-600 text-white p-5 rounded-xl shadow">
+                            <p class="text-sm opacity-80">今日运动数据</p>
+                            <div class="flex justify-between items-end mt-2">
+                                <div>
+                                    <span class="text-3xl font-bold">3h 20min</span>
+                                    <p class="text-sm">运动时长</p>
+                                </div>
+                                <div>
+                                    <span class="text-2xl font-bold">1281</span>
+                                    <span class="text-sm opacity-80">kcal</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-8 space-y-6">
+                        <div>
+                            <div class="text-sm text-gray-500 mb-2">本周运动打卡</div>
+                            <div id="weekly-checkins-home" class="flex gap-2"></div>
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-between">
+                                <h3 class="text-lg font-bold text-gray-900">推荐课程</h3>
+                                <button class="text-sm text-blue-600" onclick="goToCourses()">查看全部</button>
+                            </div>
+                            <div class="mt-3 grid grid-cols-3 gap-4">
+                                <div class="h-24 bg-gray-100 rounded-xl"></div>
+                                <div class="h-24 bg-gray-100 rounded-xl"></div>
+                                <div class="h-24 bg-gray-100 rounded-xl"></div>
+                            </div>
+                        </div>
+                        <!-- 新增：首页快捷按钮 -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <button class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg shadow hover:bg-blue-700" onclick="startTrainingFree()">自由训练</button>
+                            <button class="w-full border border-blue-600 text-blue-600 font-bold py-3 rounded-lg shadow hover:bg-blue-50" onclick="goToCourses()">全部训练</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 课程库 -->
+                <div id="page-course" class="page flex-col h-full bg-white">
+                    <div class="flex-shrink-0 h-12 bg-white border-b flex items-center px-6">
+                        <button class="text-gray-600" onclick="showPage('page-home')">返回</button>
+                        <div class="ml-4 font-bold text-gray-900">全部训练</div>
+                    </div>
+                    <div class="flex-shrink-0 p-6 bg-white border-b">
+                        <div class="max-w-3xl">
+                            <input type="search" placeholder="搜索课程/计划/动作" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        </div>
+                        <div class="mt-4 grid grid-cols-4 text-center text-sm font-medium max-w-3xl">
+                            <button id="lib-tab-course" class="py-2 bg-blue-600 text-white rounded-l-lg" onclick="switchCourseLib('course')">课程</button>
+                            <button id="lib-tab-action" class="py-2 bg-gray-50 text-gray-700 border-t border-b" onclick="switchCourseLib('action')">动作</button>
+                            <button id="lib-tab-plan" class="py-2 bg-gray-50 text-gray-700 border-t border-b" onclick="switchCourseLib('plan')">计划</button>
+                            <button id="lib-tab-fav" class="py-2 bg-gray-50 text-gray-700 rounded-r-lg border" onclick="switchCourseLib('fav')">收藏</button>
+                        </div>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-6 space-y-3" id="lib-list-course">
+                        <div class="bg-white rounded-xl shadow border border-gray-100 overflow-hidden flex" onclick="openCourseDetail('c1')">
+                            <div class="w-28 h-24 bg-gray-100"></div>
+                            <div class="flex-1 p-3">
+                                <div class="flex items-center justify-between">
+                                    <h3 class="font-semibold text-gray-900">燃脂普拉提</h3>
+                                    <div class="flex items-center gap-2 text-xs"><span class="px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded">中级</span><span class="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">普拉提</span></div>
+                                </div>
+                                <div class="mt-1 text-xs text-gray-500">33min · 217kcal</div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow border border-gray-100 overflow-hidden flex" onclick="openCourseDetail('c2')">
+                            <div class="w-28 h-24 bg-gray-100"></div>
+                            <div class="flex-1 p-3">
+                                <div class="flex items-center justify-between">
+                                    <h3 class="font-semibold text-gray-900">力量训练·核心</h3>
+                                    <div class="flex items-center gap-2 text-xs"><span class="px-1.5 py-0.5 bg-red-100 text-red-700 rounded">高级</span><span class="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">力量训练</span></div>
+                                </div>
+                                <div class="mt-1 text-xs text-gray-500">45min · 320kcal</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-6 hidden" id="lib-list-action">
+                        <div class="h-24 bg-gray-100 rounded-xl"></div>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-6 hidden" id="lib-list-plan">
+                        <div class="h-24 bg-gray-100 rounded-xl"></div>
+                    </div>
+                </div>
+
+                <!-- 课程详情 -->
+                <div id="page-course-detail" class="page flex-col h-full bg-white">
+                    <div class="flex-shrink-0 p-6 bg-white border-b flex items-center gap-3">
+                        <button class="text-gray-600" onclick="showPage('page-course')">返回</button>
+                        <h1 class="text-xl font-bold text-gray-900">课程详情</h1>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-6">
+                        <div class="h-48 bg-gray-100 rounded-xl"></div>
+                        <div class="mt-4 flex items-center gap-2">
+                            <h2 class="text-lg font-bold text-gray-900">力量训练·核心</h2>
+                            <span class="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded">中级</span>
+                            <span class="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">力量训练</span>
+                        </div>
+                        <div class="mt-2 text-sm text-gray-600 flex gap-6"><span>33min</span><span>1090kg</span><span>217kcal</span></div>
+                        <div class="mt-4">
+                            <h3 class="font-semibold text-gray-900">器械</h3>
+                            <div class="mt-2 flex flex-wrap gap-2"><span class="text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded">红铃</span><span class="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">健身凳</span></div>
+                        </div>
+                        <div class="mt-4">
+                            <h3 class="font-semibold text-gray-900">训练安排</h3>
+                            <div class="mt-2 space-y-2">
+                                <div class="bg-white border rounded p-3 flex items-center gap-3"><div class="w-10 h-10 bg-gray-100 rounded"></div><div class="flex-1"><div class="text-sm font-medium">动作名称</div><div class="text-xs text-gray-500">1.02.00</div></div></div>
+                                <div class="bg-white border rounded p-3 flex items-center gap-3"><div class="w-10 h-10 bg-gray-100 rounded"></div><div class="flex-1"><div class="text-sm font-medium">动作名称</div><div class="text-xs text-gray-500">2.02.00</div></div></div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 底部大按钮 -->
+                    <div class="flex-shrink-0 p-6 bg-white border-t flex gap-4">
+                        <button class="flex-1 text-lg py-4 border rounded-lg" onclick="openScheduleOverlay()">加入日程</button>
+                        <button class="flex-1 text-lg py-4 bg-blue-600 text-white rounded-lg" onclick="startTraining()">开始训练</button>
+                    </div>
+                </div>
+
+                <!-- 训练中（播放器） -->
+                <div id="page-training" class="page flex-col h-full bg-white">
+                    <div class="flex-shrink-0 p-4 bg-white border-b">
+                        <div class="flex items-center justify-between">
+                            <div class="font-bold text-gray-900">当前动作名称</div>
+                            <div class="flex items-center gap-3 text-gray-600">
+                                <button class="px-2 py-1 border rounded" onclick="trainingRewind()">« 快退</button>
+                                <button id="btnPlayPause" class="px-2 py-1 border rounded" onclick="trainingPlayPause()">暂停</button>
+                                <button class="px-2 py-1 border rounded" onclick="trainingForward()">快进 »</button>
+                                <button class="px-2 py-1 border rounded" onclick="trainingReset()">重置</button>
+                                <button class="px-2 py-1 border rounded text-red-600" onclick="trainingEnd()">结束</button>
+                            </div>
+                        </div>
+                        <div class="mt-3 flex items-center gap-3">
+                            <div class="h-2 flex-1 bg-gray-200 rounded overflow-hidden">
+                                <div id="progressBar" class="h-full bg-blue-600" style="width:0%"></div>
+                            </div>
+                            <div id="timeText" class="text-xs text-gray-500 w-28 text-right">00:00 / 00:00</div>
+                        </div>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-6">
+                        <div class="h-60 bg-gray-100 rounded-xl flex items-center justify-center text-gray-400">视频占位（自动播放）</div>
+                        <!-- 传感器图表 -->
+                        <div class="mt-6 grid grid-cols-12 gap-6">
+                            <div class="col-span-6">
+                                <div class="text-xs text-gray-500 mb-1">动作功率</div>
+                                <div class="h-24 bg-white border rounded-xl p-3 flex items-end gap-1" id="powerBars"></div>
+                            </div>
+                            <div class="col-span-6">
+                                <div class="text-xs text-gray-500 mb-1">动作幅度 L/R</div>
+                                <div class="h-24 bg-white border rounded-xl p-3 grid grid-cols-2 gap-2">
+                                    <div class="flex items-end gap-1" id="ampBarsL"></div>
+                                    <div class="flex items-end gap-1" id="ampBarsR"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 重量 / 模式 / 助力 区域 -->
+                        <div class="mt-6">
+                            <div class="bg-white border rounded-xl p-5">
+                                <div class="flex items-center justify-center gap-6">
+                                    <button class="px-5 py-3 border rounded text-lg" onclick="adjustWeight(-0.5)">-0.5kg</button>
+                                    <div class="text-center">
+                                        <div class="text-xs text-gray-500">重量</div>
+                                        <div id="weightVal" class="text-4xl font-bold my-1">7.0kg</div>
+                                    </div>
+                                    <button class="px-5 py-3 border rounded text-lg" onclick="adjustWeight(0.5)">+0.5kg</button>
+                                </div>
+                                <div class="flex gap-3 justify-center mt-4">
+                                    <button class="px-4 py-2 border rounded" onclick="openModeOverlay()">模式切换</button>
+                                    <button id="assistSwitchBtn" class="px-4 py-2 border rounded" onclick="toggleAssistDirect()">助力：开</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 加入日程 弹层 -->
+                <div id="overlay-schedule" class="hidden absolute inset-0 z-40">
+                    <div class="absolute inset-0 bg-black/30" onclick="closeScheduleOverlay()"></div>
+                    <div id="overlay-schedule-sheet" class="absolute inset-x-0 bottom-0 bg-white rounded-t-2xl shadow-2xl p-4 transform translate-y-full transition-transform duration-200 ease-out">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-lg font-bold text-gray-900">选择日期</h3>
+                            <button class="text-gray-500" onclick="closeScheduleOverlay()">关闭</button>
+                        </div>
+                        <div class="mt-3">
+                            <div id="calendar" class="grid grid-cols-7 gap-2 text-center text-sm text-gray-700"></div>
+                        </div>
+                        <div class="mt-4 flex items-center">
+                            <div class="w-14 h-10 bg-gray-100 rounded mr-3"></div>
+                            <div class="text-sm text-gray-700">课程名称 · <span id="schedule-date-text" class="font-medium">未选择</span></div>
+                        </div>
+                        <div class="mt-4">
+                            <button onclick="confirmAddToSchedule()" id="btn-add-schedule" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg disabled:opacity-50" disabled>加入日程</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 模式切换弹层 -->
+                <div id="overlay-mode" class="hidden absolute inset-0 z-40">
+                    <div class="absolute inset-0 bg-black/50" onclick="closeModeOverlay()"></div>
+                    <div class="absolute inset-x-0 bottom-0 bg-white rounded-t-2xl shadow-2xl p-6">
+                        <div class="text-lg font-bold text-gray-900 mb-4">模式切换</div>
+                        <div class="grid grid-cols-3 gap-3">
+                            <button class="px-3 py-2 border rounded" onclick="setTrainingMode('标准')">标准</button>
+                            <button class="px-3 py-2 border rounded" onclick="setTrainingMode('等速')">等速</button>
+                            <button class="px-3 py-2 border rounded" onclick="setTrainingMode('等距')">等距</button>
+                        </div>
+                        <div class="mt-4">
+                            <button class="w-full px-3 py-2 border rounded" onclick="closeModeOverlay()">关闭</button>
+                        </div>
+                    </div>
+                </div>
+
+                
+
+                <!-- 训练报告 -->
+                <div id="page-report" class="page flex-col h-full bg-white">
+                    <div class="flex-shrink-0 h-12 bg-white border-b flex items-center px-6">
+                        <button class="text-gray-600" onclick="showPage('page-home')">完成</button>
+                        <div class="ml-4 font-bold text-gray-900">训练报告</div>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-6 space-y-6">
+                        <!-- 总览指标 -->
+                        <div class="bg-white rounded-xl border p-4 grid grid-cols-4 gap-4">
+                            <div><div class="text-xs text-gray-500">时长</div><div id="repDur" class="text-xl font-bold">--</div></div>
+                            <div><div class="text-xs text-gray-500">总量(kg)</div><div id="repVol" class="text-xl font-bold">--</div></div>
+                            <div><div class="text-xs text-gray-500">总消耗(kcal)</div><div id="repCal" class="text-xl font-bold">--</div></div>
+                            <div><div class="text-xs text-gray-500">动作次数</div><div id="repReps" class="text-xl font-bold">--</div></div>
+                            <div><div class="text-xs text-gray-500">平均功率(W)</div><div id="repPowerAvg" class="text-xl font-bold">--</div></div>
+                            <div><div class="text-xs text-gray-500">峰值功率(W)</div><div id="repPowerPeak" class="text-xl font-bold">--</div></div>
+                            <div><div class="text-xs text-gray-500">平均节奏(次/分)</div><div id="repCadence" class="text-xl font-bold">--</div></div>
+                            <div><div class="text-xs text-gray-500">ROM 左/右(%)</div><div id="repROM" class="text-xl font-bold">--</div></div>
+                        </div>
+
+                        <!-- 强度分布 -->
+                        <div class="bg-white rounded-xl border p-4">
+                            <div class="text-sm text-gray-700 mb-3">强度分布（功率区间）</div>
+                            <div class="w-full h-6 bg-gray-100 rounded overflow-hidden flex" id="repZones"></div>
+                            <div class="mt-2 text-xs text-gray-500" id="repZoneLabel"></div>
+                        </div>
+
+                        <!-- 组别明细 -->
+                        <div class="bg-white rounded-xl border p-4">
+                            <div class="text-sm text-gray-700 mb-3">组别明细</div>
+                            <div class="grid grid-cols-5 text-xs text-gray-500 px-2 py-1">
+                                <div>组次</div><div>次数</div><div>重量(kg)</div><div>平均功率(W)</div><div>RPE</div>
+                            </div>
+                            <div id="repSetTable" class="divide-y"></div>
+                        </div>
+
+                        <!-- 趋势图占位 -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="bg-white rounded-xl border p-4">
+                                <div class="text-sm text-gray-700 mb-2">功率曲线</div>
+                                <div id="repPowerCurve" class="h-32 bg-gray-100 rounded"></div>
+                            </div>
+                            <div class="bg-white rounded-xl border p-4">
+                                <div class="text-sm text-gray-700 mb-2">心率曲线</div>
+                                <div id="repHeartCurve" class="h-32 bg-gray-100 rounded"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 游客模式：独立预览界面（与登录后不同） -->
+                <div id="page-guest" class="page flex-col h-full bg-white">
+                    <div class="p-8 border-b">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-sm text-gray-500">当前：游客用户</div>
+                                <div class="text-xl font-bold text-gray-900 mt-1">欢迎体验</div>
+                            </div>
+                            <button class="px-3 py-2 text-sm border rounded-lg" onclick="showToast('请登录以保存训练数据')">登录账号</button>
+                        </div>
+                        <div class="mt-4 text-sm text-gray-600">在游客模式下可以浏览示例课程和计划，但不会保存个人数据。</div>
+                    </div>
+                <div class="p-8 space-y-8">
+                    <!-- 快速体验 -->
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="bg-white rounded-xl p-4 border">
+                            <div class="text-xs text-gray-500">示例课程</div>
+                            <div class="h-24 bg-gray-100 rounded mt-2"></div>
+                            <button class="w-full mt-3 bg-blue-600 text-white text-sm py-2 rounded">开始自由训练</button>
+                        </div>
+                        <div class="bg-white rounded-xl p-4 border">
+                            <div class="text-xs text-gray-500">训练计划预览</div>
+                            <div class="h-24 bg-gray-100 rounded mt-2"></div>
+                            <button class="w-full mt-3 border text-gray-700 text-sm py-2 rounded" onclick="showToast('登录后可加入计划')">加入计划（需登录）</button>
+                        </div>
+                        <div class="bg-white rounded-xl p-4 border">
+                            <div class="text-xs text-gray-500">动作教学</div>
+                            <div class="h-24 bg-gray-100 rounded mt-2"></div>
+                            <button class="w-full mt-3 border text-gray-700 text-sm py-2 rounded" onclick="showToast('登录后可收藏')">收藏（需登录）</button>
+                        </div>
+                    </div>
+
+                    <!-- 课程精选 -->
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-lg font-bold text-gray-900">课程精选</h3>
+                            <button class="text-sm text-blue-600">更多</button>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4">
+                            <div class="h-28 bg-gray-100 rounded-xl"></div>
+                            <div class="h-28 bg-gray-100 rounded-xl"></div>
+                            <div class="h-28 bg-gray-100 rounded-xl"></div>
+                        </div>
+                    </div>
+
+                    <!-- 训练计划 -->
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-lg font-bold text-gray-900">训练计划</h3>
+                            <button class="text-sm text-blue-600">更多</button>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4">
+                            <div class="h-24 bg-gray-100 rounded-xl"></div>
+                            <div class="h-24 bg-gray-100 rounded-xl"></div>
+                            <div class="h-24 bg-gray-100 rounded-xl"></div>
+                        </div>
+                    </div>
+
+                    <!-- 动作教学 -->
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-lg font-bold text-gray-900">动作教学</h3>
+                            <button class="text-sm text-blue-600">更多</button>
+                        </div>
+                        <div class="grid grid-cols-4 gap-4">
+                            <div class="h-24 bg-gray-100 rounded-xl"></div>
+                            <div class="h-24 bg-gray-100 rounded-xl"></div>
+                            <div class="h-24 bg-gray-100 rounded-xl"></div>
+                            <div class="h-24 bg-gray-100 rounded-xl"></div>
+                        </div>
+                    </div>
+                </div>
+                </div>
+
+                <!-- 忘记密码（简化） -->
+                <div id="page-forgot" class="page flex-col p-8 h-full bg-white">
+                    <svg onclick="showPage('page-login')" class="w-6 h-6 text-gray-500 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                    <h1 class="text-3xl font-bold text-gray-900 mt-4">重置密码</h1>
+                    <div class="space-y-4 max-w-xl mt-6">
+                        <input type="email" placeholder="邮箱/手机号" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="password" placeholder="设置新密码" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="password" placeholder="确认新密码" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <button onclick="resetPassword()" class="w-full max-w-xl bg-blue-600 text-white font-bold py-3 rounded-lg shadow mt-8 hover:bg-blue-700">提交</button>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- 控制中心（从顶部下拉） -->
+        <div id="controlCenter" class="control-center transition-fast">
+            <div class="h-full bg-white rounded-b-2xl shadow-2xl border-b border-gray-100 flex flex-col">
+                <!-- 顶部标题（保持简洁） -->
+                <div class="px-6 pt-4 pb-3 text-sm text-gray-500">控制中心</div>
+                <!-- 内容：每行一个控制项，更宽更易点按 -->
+                <div class="px-6 pb-4 flex-1 overflow-y-auto space-y-4">
+                    <!-- 亮度 -->
+                    <div class="p-4 rounded-xl border bg-white">
+                        <div class="flex items-center justify-between">
+                            <div class="font-semibold">屏幕亮度</div>
+                            <div id="brightnessVal" class="text-xs text-gray-500">100%</div>
+                        </div>
+                        <input id="brightness" type="range" min="1" max="100" value="100" class="w-full mt-3 accent-blue-600" />
+                    </div>
+                    <!-- 音量 -->
+                    <div class="p-4 rounded-xl border bg-white">
+                        <div class="flex items-center justify-between">
+                            <div class="font-semibold">系统音量</div>
+                            <div id="volumeVal" class="text-xs text-gray-500">50%</div>
+                        </div>
+                        <input id="volume" type="range" min="0" max="100" value="50" class="w-full mt-3 accent-blue-600" />
+                        <div class="text-xs text-gray-400 mt-2">提示：仅示意，不改变系统音量</div>
+                    </div>
+                    <!-- Wi‑Fi -->
+                    <div class="p-4 rounded-xl border bg-white">
+                        <div class="flex items-center justify-between">
+                            <div class="font-semibold">Wi‑Fi</div>
+                            <button id="wifiToggleBtn" class="px-3 py-1 text-sm rounded border bg-gray-50 text-gray-700">开启</button>
+                        </div>
+                        <div id="wifiStatus" class="text-xs text-gray-500 mt-2">未连接</div>
+                        <div id="wifiList" class="mt-3 hidden space-y-1"></div>
+                    </div>
+                    <!-- 蓝牙 -->
+                    <div class="p-4 rounded-xl border bg-white">
+                        <div class="flex items-center justify-between">
+                            <div class="font-semibold">蓝牙</div>
+                            <button id="btToggleBtn" class="px-3 py-1 text-sm rounded border bg-gray-50 text-gray-700">开启</button>
+                        </div>
+                        <div id="btStatus" class="text-xs text-gray-500 mt-2">未开启</div>
+                        <div id="btList" class="mt-3 hidden space-y-1"></div>
+                    </div>
+                </div>
+                <!-- 底部固定操作区：收起按钮 -->
+                <div class="px-6 pb-5 pt-3 bg-white/95 backdrop-blur border-t">
+                    <button id="btnCloseCC" class="w-full px-3 py-3 text-sm border rounded-lg">收起</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 屏幕亮度遮罩（放在最上层但不遮住控制中心） -->
+        <div class="brightness-overlay"></div>
+
+        <!-- Toast -->
+        <div id="app-toast" class="hidden absolute left-1/2 -translate-x-1/2 bottom-10 bg-black text-white text-sm px-3 py-2 rounded-lg shadow z-50">提示</div>
+    </div>
+
+    <script>
+        let currentPage = 'page-welcome';
+        let currentLoginTab = 'phone';
+        let currentRegisterTab = 'phone';
+
+        function showPage(id) {
+            if (currentPage) {
+                const oldPage = document.getElementById(currentPage);
+                if (oldPage) oldPage.classList.remove('active');
+            }
+            const next = document.getElementById(id);
+            if (next) {
+                next.classList.add('active');
+                currentPage = id;
+                if (id === 'page-register-success') {
+                    setTimeout(() => showPage('page-home'), 1500);
+                }
+            }
+        }
+
+        function startCountdown(button) {
+            let s = 60; button.disabled = true; button.textContent = '60s 后重试';
+            const t = setInterval(() => { s--; if (s>0) { button.textContent = s+'s 后重试'; } else { clearInterval(t); button.disabled=false; button.textContent='获取验证码'; } }, 1000);
+        }
+
+        function toggleLoginMode(mode) {
+            if (currentLoginTab === mode) return;
+            const on = (id, active) => {
+                const el = document.getElementById(id);
+                el.classList.toggle('bg-blue-600', active);
+                el.classList.toggle('text-white', active);
+                el.classList.toggle('bg-gray-50', !active);
+                el.classList.toggle('text-gray-600', !active);
+            };
+            on('tab-btn-phone', mode==='phone');
+            on('tab-btn-password', mode==='password');
+            on('tab-btn-email', mode==='email');
+            document.getElementById('mode-phone').classList.toggle('hidden', mode!=='phone');
+            document.getElementById('mode-password').classList.toggle('hidden', mode!=='password');
+            document.getElementById('mode-email').classList.toggle('hidden', mode!=='email');
+            currentLoginTab = mode;
+        }
+
+        function login() {
+            const agreed = document.getElementById('agree-login').checked;
+            if (!agreed) { alert('请先阅读并同意用户协议和隐私政策'); return; }
+            showPage('page-home');
+            renderWeeklyCheckins('weekly-checkins-home');
+        }
+        function registerStep1() {
+            const agreed = document.getElementById('agree-register').checked;
+            if (!agreed) { alert('请先阅读并同意用户协议和隐私政策'); return; }
+            showPage('page-register-step2');
+        }
+        function registerStep2() { showPage('page-register-success'); }
+        function resetPassword() { alert('密码重置成功！（演示）'); showPage('page-login'); }
+
+        // 注册页：切换注册模式 (手机/邮箱)
+        function toggleRegisterMode(mode) {
+            if (currentRegisterTab === mode) return;
+            const on = (id, active) => {
+                const el = document.getElementById(id);
+                el.classList.toggle('bg-blue-600', active);
+                el.classList.toggle('text-white', active);
+                el.classList.toggle('bg-gray-50', !active);
+                el.classList.toggle('text-gray-600', !active);
+            };
+            on('tab-btn-reg-phone', mode==='phone');
+            on('tab-btn-reg-email', mode==='email');
+            document.getElementById('reg-mode-phone').classList.toggle('hidden', mode!=='phone');
+            document.getElementById('reg-mode-email').classList.toggle('hidden', mode!=='email');
+            currentRegisterTab = mode;
+        }
+
+        // 本周打卡（示意：今天/过去/未来）
+        function renderWeeklyCheckins(targetId) {
+            const container = document.getElementById(targetId); if (!container) return; container.innerHTML = '';
+            const now = new Date(); const weekday = (now.getDay() + 6) % 7; const monday = new Date(now); monday.setDate(now.getDate() - weekday);
+            for (let i=0;i<7;i++){ const d=new Date(monday); d.setDate(monday.getDate()+i); const el=document.createElement('span'); el.textContent=d.getDate(); el.className='w-9 h-9 rounded-full text-xs flex items-center justify-center font-medium transition'; if (d.toDateString()===now.toDateString()){ el.className+=' bg-white text-blue-700 border border-blue-600 ring-4 ring-blue-100 shadow'; } else if (d<now){ el.className+=' bg-blue-600 text-white shadow ring-4 ring-blue-100'; } else { el.className+=' bg-blue-50 text-blue-700'; } container.appendChild(el);} }
+
+        // 日期文本
+        function setToday() { const el = document.getElementById('home-date'); if (!el) return; const n=new Date(); el.textContent = `${n.getFullYear()}年${n.getMonth()+1}月${n.getDate()}日`; }
+
+        // 控制中心逻辑
+        const cc = document.getElementById('controlCenter');
+        const btnOpen = document.getElementById('btnOpenCC');
+        const btnClose = document.getElementById('btnCloseCC');
+        const gestureArea = document.getElementById('gestureArea');
+        let dragging = false; let startY = 0; let startTop = 0;
+
+        const openCC = () => { cc.classList.add('open'); cc.style.top = '0px'; };
+        const closeCC = () => { cc.classList.remove('open'); cc.style.top = '-70%'; };
+        btnOpen.addEventListener('click', openCC);
+        btnClose.addEventListener('click', closeCC);
+
+        // 手势：顶部下拉/上推
+        const onStart = (y) => { dragging = true; startY = y; startTop = cc.getBoundingClientRect().top; cc.style.transition = 'none'; };
+        const onMove = (y) => {
+            if (!dragging) return;
+            const delta = y - startY; // 向下正
+            let top = Math.min(0, startTop + delta);
+            cc.style.top = top + 'px';
+        };
+        const onEnd = () => {
+            if (!dragging) return; dragging = false; cc.style.transition = '';
+            // 根据位置决定展开或收起
+            const rect = cc.getBoundingClientRect();
+            if (rect.top > -rect.height * 0.5) openCC(); else closeCC();
+        };
+        // 触摸
+        gestureArea.addEventListener('touchstart', e => onStart(e.touches[0].clientY), {passive:true});
+        gestureArea.addEventListener('touchmove', e => onMove(e.touches[0].clientY), {passive:true});
+        gestureArea.addEventListener('touchend', onEnd);
+        // 鼠标（方便在电脑上演示）
+        gestureArea.addEventListener('mousedown', e => onStart(e.clientY));
+        window.addEventListener('mousemove', e => onMove(e.clientY));
+        window.addEventListener('mouseup', onEnd);
+
+        // Wi‑Fi/蓝牙/亮度/音量交互
+        const wifiToggleBtn = document.getElementById('wifiToggleBtn');
+        const wifiStatus = document.getElementById('wifiStatus');
+        const wifiList = document.getElementById('wifiList');
+        let wifiOn = false; let wifiConnecting = null; let wifiConnected = null;
+        const wifiNetworks = [
+            { ssid: 'Ebl-Guest', rssi: -40 },
+            { ssid: 'Studio-AP', rssi: -55 },
+            { ssid: 'Home-2G', rssi: -68 },
+            { ssid: 'Cafe-5G', rssi: -72 }
+        ];
+        function signalBars(rssi){ if (rssi>-50) return '▮▮▮▮'; if (rssi>-60) return '▮▮▮▯'; if (rssi>-70) return '▮▮▯▯'; return '▮▯▯▯'; }
+        function renderWifiList(){
+            wifiList.innerHTML = '';
+            wifiNetworks.forEach(n => {
+                const isConn = wifiConnected === n.ssid;
+                const isConnecting = wifiConnecting === n.ssid;
+                const btn = document.createElement('button');
+                btn.className = 'w-full flex items-center justify-between px-3 py-2 rounded hover:bg-gray-50';
+                btn.onclick = () => connectWifi(n.ssid);
+                btn.innerHTML = `<div class="flex items-center gap-2"><span class="text-gray-800">${n.ssid}</span>${isConn?'<span class=\"text-xs text-green-600\">已连接</span>': isConnecting? '<span class=\"text-xs text-gray-500\">连接中…</span>':''}</div><div class="text-gray-400 text-sm">${signalBars(n.rssi)}</div>`;
+                wifiList.appendChild(btn);
+            });
+        }
+        function connectWifi(ssid){ if (!wifiOn) return; wifiConnecting = ssid; wifiStatus.textContent = `正在连接 ${ssid}…`; renderWifiList(); setTimeout(()=>{ wifiConnecting=null; wifiConnected=ssid; wifiStatus.textContent = `已连接：${ssid}`; renderWifiList(); showToast('Wi‑Fi 已连接'); }, 1000); }
+        wifiToggleBtn.addEventListener('click', () => {
+            wifiOn = !wifiOn;
+            wifiToggleBtn.textContent = wifiOn ? '关闭' : '开启';
+            if (wifiOn) { wifiStatus.textContent = '扫描可用网络…'; wifiList.classList.remove('hidden'); renderWifiList(); }
+            else { wifiConnected=null; wifiConnecting=null; wifiStatus.textContent='未连接'; wifiList.classList.add('hidden'); }
+        });
+
+        const btToggleBtn = document.getElementById('btToggleBtn');
+        const btStatus = document.getElementById('btStatus');
+        const btList = document.getElementById('btList');
+        let btOn = false;
+        function renderBTList(){
+            btList.innerHTML = '';
+            ['HR-Strap-001', 'Row-Handle-12'].forEach(name => {
+                const b = document.createElement('button');
+                b.className='w-full text-left px-3 py-2 rounded hover:bg-gray-50';
+                b.textContent = name;
+                b.onclick = () => connectBT(name);
+                btList.appendChild(b);
+            });
+        }
+        function connectBT(name){ btStatus.textContent = `正在连接 ${name}…`; setTimeout(()=>{ btStatus.textContent = `已连接：${name}`; showToast('蓝牙设备已连接'); }, 800); }
+        btToggleBtn.addEventListener('click', ()=>{ btOn=!btOn; btToggleBtn.textContent = btOn ? '关闭' : '开启'; if (btOn){ btStatus.textContent='可被发现，正在搜索设备…'; btList.classList.remove('hidden'); renderBTList(); } else { btStatus.textContent='未开启'; btList.classList.add('hidden'); } });
+
+        // 亮度/音量
+        const brightness = document.getElementById('brightness');
+        const brightnessVal = document.getElementById('brightnessVal');
+        const volume = document.getElementById('volume');
+        const volumeVal = document.getElementById('volumeVal');
+        const deviceEl = document.getElementById('device');
+        const setBrightness = (v) => { const f = Math.max(0.1, v/100); deviceEl.style.setProperty('--device-brightness', String(f)); brightnessVal.textContent = Math.round(v)+'%'; };
+        brightness.addEventListener('input', e => setBrightness(e.target.value));
+        volume.addEventListener('input', e => volumeVal.textContent = Math.round(e.target.value)+'%');
+
+        // Toast
+        function showToast(text){ const el = document.getElementById('app-toast'); el.textContent=text; el.classList.remove('hidden'); el.style.opacity='1'; setTimeout(()=>{ el.style.opacity='0'; setTimeout(()=>el.classList.add('hidden'), 200); }, 1200); }
+
+        // 首页入口：课程库
+        function goToCourses(){ showPage('page-course'); }
+
+        // 课程库分类
+        function switchCourseLib(cat){
+            const ids=['course','action','plan','fav'];
+            ids.forEach(id=>{
+                const b=document.getElementById('lib-tab-'+id); if (!b) return;
+                if (id===cat){ b.classList.remove('bg-gray-50','text-gray-700'); b.classList.add('bg-blue-600','text-white'); }
+                else { b.classList.add('bg-gray-50','text-gray-700'); b.classList.remove('bg-blue-600','text-white'); }
+            });
+            document.getElementById('lib-list-course').classList.toggle('hidden', cat!=='course');
+            document.getElementById('lib-list-action').classList.toggle('hidden', cat!=='action');
+            document.getElementById('lib-list-plan').classList.toggle('hidden', cat!=='plan');
+        }
+
+        // 课程详情
+        function openCourseDetail(id){ showPage('page-course-detail'); }
+
+        // 日程：加入日程
+        function openScheduleOverlay(){
+            buildCalendar();
+            document.getElementById('btn-add-schedule').disabled = true;
+            document.getElementById('schedule-date-text').textContent = '未选择';
+            const overlay = document.getElementById('overlay-schedule');
+            const sheet = document.getElementById('overlay-schedule-sheet');
+            overlay.classList.remove('hidden');
+            requestAnimationFrame(()=> sheet.classList.remove('translate-y-full'));
+        }
+        function closeScheduleOverlay(){
+            const overlay = document.getElementById('overlay-schedule');
+            const sheet = document.getElementById('overlay-schedule-sheet');
+            sheet.classList.add('translate-y-full');
+            setTimeout(()=> overlay.classList.add('hidden'), 200);
+        }
+        function buildCalendar(){
+            const calendar=document.getElementById('calendar'); if (!calendar) return; calendar.innerHTML='';
+            const now=new Date(); const y=now.getFullYear(); const m=now.getMonth(); const first=new Date(y,m,1); const start=first.getDay(); const days=new Date(y,m+1,0).getDate();
+            for(let i=0;i<start;i++){ const b=document.createElement('div'); calendar.appendChild(b); }
+            for(let d=1; d<=days; d++){ const btn=document.createElement('button'); btn.textContent=String(d); btn.className='py-2 rounded hover:bg-gray-100'; btn.onclick=()=>selectScheduleDate(y,m+1,d,btn); calendar.appendChild(btn); }
+        }
+        function selectScheduleDate(y,m,d,el){ document.querySelectorAll('#calendar button').forEach(b=>b.classList.remove('bg-blue-600','text-white')); el.classList.add('bg-blue-600','text-white'); const t=`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`; document.getElementById('schedule-date-text').textContent=t; document.getElementById('btn-add-schedule').disabled=false; }
+        function confirmAddToSchedule(){ closeScheduleOverlay(); showToast('已加入日程'); }
+
+        // 训练播放（模拟）
+        let trainingTimer=null; let trainingDuration=600; let trainingCurrent=0; let trainingPlaying=true; let trainingWeight=7.0; let trainingMode='标准'; let assistOn=true;
+        function startTraining(){ showPage('page-training'); trainingDuration=600; trainingCurrent=0; trainingPlaying=true; document.getElementById('btnPlayPause').textContent='暂停'; updateProgressUI(); updateAssistBtn(); spawnBars(); runTrainingTimer(); }
+        function startTrainingFree(){ startTraining(); showToast('已进入自由训练'); }
+        function runTrainingTimer(){ if (trainingTimer) clearInterval(trainingTimer); trainingTimer=setInterval(()=>{ if (!trainingPlaying) return; trainingCurrent=Math.min(trainingDuration, trainingCurrent+1); updateProgressUI(); randomizeSensors(); if (trainingCurrent>=trainingDuration) { trainingPlaying=false; trainingEnd(); } }, 1000); }
+        function updateProgressUI(){ const pct = trainingDuration? (trainingCurrent/trainingDuration*100):0; document.getElementById('progressBar').style.width=pct+'%'; document.getElementById('timeText').textContent = fmtTime(trainingCurrent)+' / '+fmtTime(trainingDuration); document.getElementById('weightVal').textContent = trainingWeight.toFixed(1)+'kg'; }
+        function fmtTime(s){ const m=Math.floor(s/60); const ss=String(s%60).padStart(2,'0'); return `${String(m).padStart(2,'0')}:${ss}`; }
+        function trainingPlayPause(){ trainingPlaying=!trainingPlaying; document.getElementById('btnPlayPause').textContent = trainingPlaying? '暂停':'播放'; }
+        function trainingRewind(){ trainingCurrent=Math.max(0, trainingCurrent-10); updateProgressUI(); }
+        function trainingForward(){ trainingCurrent=Math.min(trainingDuration, trainingCurrent+10); updateProgressUI(); }
+        function trainingReset(){ trainingCurrent=0; trainingPlaying=true; updateProgressUI(); }
+        function trainingEnd(){ if (trainingTimer) clearInterval(trainingTimer); // mock report
+            const dur=trainingCurrent;
+            // 生成组别数据
+            const setCount = 10;
+            let totalReps = 0; let totalVolume = 0; let powerAvg = 0; let powerPeak = 0;
+            const table = document.getElementById('repSetTable'); table.innerHTML='';
+            for (let i=1;i<=setCount;i++){
+                const reps = 8 + Math.floor(Math.random()*5); // 8~12
+                const w = Math.max(1, Math.round((trainingWeight + (Math.random()-0.5))*2)/2);
+                const p = 60 + Math.floor(Math.random()*80);
+                const rpe = 6 + Math.floor(Math.random()*4);
+                totalReps += reps; totalVolume += (w*reps); powerAvg += p; powerPeak = Math.max(powerPeak, p + Math.floor(Math.random()*40));
+                const row = document.createElement('div'); row.className='grid grid-cols-5 px-2 py-2 text-sm';
+                row.innerHTML = `<div>${i}</div><div>${reps}</div><div>${w.toFixed(1)}</div><div>${p}</div><div>${rpe}</div>`;
+                table.appendChild(row);
+            }
+            powerAvg = Math.round(powerAvg / setCount);
+            const cal = Math.round(dur * 0.16); // 估算
+            // 区间分布
+            const zones = [0,0,0,0,0];
+            for (let i=0;i<setCount;i++){ const z = Math.floor(Math.random()*5); zones[z]+=1; }
+            const zonePct = zones.map(z=> Math.round(z/setCount*100));
+            const repZones = document.getElementById('repZones'); repZones.innerHTML='';
+            const colors = ['#d1fae5','#a7f3d0','#6ee7b7','#34d399','#059669'];
+            zonePct.forEach((pct,idx)=>{ const seg=document.createElement('div'); seg.style.width=pct+'%'; seg.style.backgroundColor=colors[idx]; repZones.appendChild(seg); });
+            document.getElementById('repZoneLabel').textContent = `Z1 ${zonePct[0]}% · Z2 ${zonePct[1]}% · Z3 ${zonePct[2]}% · Z4 ${zonePct[3]}% · Z5 ${zonePct[4]}%`;
+            // 曲线占位（简单条形）
+            renderCurve('repPowerCurve'); renderCurve('repHeartCurve');
+            // 概览赋值
+            document.getElementById('repDur').textContent = fmtTime(dur);
+            document.getElementById('repVol').textContent = Math.round(totalVolume).toString();
+            document.getElementById('repCal').textContent = cal.toString();
+            document.getElementById('repReps').textContent = totalReps.toString();
+            document.getElementById('repPowerAvg').textContent = powerAvg.toString();
+            document.getElementById('repPowerPeak').textContent = powerPeak.toString();
+            document.getElementById('repCadence').textContent = (totalReps / (dur/60)).toFixed(0);
+            document.getElementById('repROM').textContent = `${(60+Math.random()*30).toFixed(0)} / ${(60+Math.random()*30).toFixed(0)}`;
+            showPage('page-report'); }
+        function adjustWeight(delta){ trainingWeight = Math.max(0, Math.round((trainingWeight+delta)*2)/2); updateProgressUI(); }
+
+        // 传感器占位条
+        function spawnBars(){ const p=document.getElementById('powerBars'); const l=document.getElementById('ampBarsL'); const r=document.getElementById('ampBarsR'); [p,l,r].forEach(c=>c.innerHTML=''); for(let i=0;i<24;i++){ const b=document.createElement('div'); b.style.width='4px'; b.style.height='10px'; b.className='bg-blue-300 rounded'; p.appendChild(b); } for(let i=0;i<12;i++){ const bl=document.createElement('div'); bl.style.width='6px'; bl.style.height='10px'; bl.className='bg-green-300 rounded'; l.appendChild(bl); const br=document.createElement('div'); br.style.width='6px'; br.style.height='10px'; br.className='bg-purple-300 rounded'; r.appendChild(br); } }
+        function randomizeSensors(){ const p=document.getElementById('powerBars').children; for(let i=0;i<p.length;i++){ p[i].style.height = (6 + Math.random()*70)+'px'; } const l=document.getElementById('ampBarsL').children; const r=document.getElementById('ampBarsR').children; for(let i=0;i<l.length;i++){ l[i].style.height=(6+Math.random()*70)+'px'; r[i].style.height=(6+Math.random()*70)+'px'; } }
+
+        function renderCurve(id){ const el=document.getElementById(id); el.innerHTML=''; const wrap=document.createElement('div'); wrap.className='h-full flex items-end gap-1 p-2'; for(let i=0;i<40;i++){ const b=document.createElement('div'); b.style.width='4px'; b.style.height=(10+Math.random()*80)+'px'; b.className='bg-blue-300 rounded'; wrap.appendChild(b); } el.appendChild(wrap); }
+
+        // 模式 & 助力
+        function openModeOverlay(){ document.getElementById('overlay-mode').classList.remove('hidden'); }
+        function closeModeOverlay(){ document.getElementById('overlay-mode').classList.add('hidden'); }
+        function setTrainingMode(m){ trainingMode=m; showToast('已切换模式：'+m); closeModeOverlay(); }
+        function toggleAssistDirect(){ assistOn=!assistOn; updateAssistBtn(); showToast('助力已'+(assistOn?'开启':'关闭')); }
+        function updateAssistBtn(){ const b=document.getElementById('assistSwitchBtn'); if (b) b.textContent = '助力：'+(assistOn?'开':'关'); }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            // 默认只显示欢迎页
+            document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+            document.getElementById('page-welcome').classList.add('active');
+            document.getElementById('agree-login').checked = true;
+            document.getElementById('agree-register').checked = true;
+            // 勾选框视觉同步
+            document.querySelectorAll('.hidden-input[type="checkbox"]').forEach(input=>{
+                const icon = input.nextElementSibling?.querySelector('svg'); if (!icon) return; icon.classList.toggle('hidden', !input.checked);
+                input.addEventListener('change', e=> icon.classList.toggle('hidden', !e.target.checked));
+            });
+            setToday();
+        });
+    </script>
+</body>
+</html>
+
+
