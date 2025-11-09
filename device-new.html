@@ -161,6 +161,65 @@
                     </div>
                 </div>
 
+                <!-- 日常登录：欢迎页 -->
+                <div id="page-auth-landing" class="page flex-col h-full bg-white">
+                    <div class="flex-shrink-0 h-12 flex items-center justify-between px-6 border-b">
+                        <div class="text-sm font-semibold text-gray-800">MotionStation</div>
+                        <button class="text-sm text-blue-600 hover:text-blue-700" onclick="openRegionPicker()">切换地区</button>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-8 bg-gray-50">
+                        <div class="max-w-md mx-auto space-y-8">
+                            <div class="space-y-4 text-center">
+                                <div class="mx-auto w-48 h-16 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-2xl shadow-lg flex items-center justify-center text-white text-lg font-semibold tracking-wide">MotionStation</div>
+                                <div class="mx-auto w-64 h-64 bg-white border border-blue-100 rounded-3xl shadow-inner flex flex-col items-center justify-center text-gray-500">
+                                    <span class="text-sm">欢迎回来</span>
+                                    <span class="mt-2 text-2xl font-semibold text-gray-800">开启今日训练</span>
+                                </div>
+                                <div class="text-xs text-gray-500">智能互联训练系统 · 同步云端进度与设备体验</div>
+                            </div>
+                            <div class="space-y-3">
+                                <button class="w-full py-3 rounded-xl bg-blue-600 text-white font-semibold shadow hover:bg-blue-700 transition" onclick="openReturningLogin()">账号登录</button>
+                                <button class="w-full py-3 rounded-xl border border-gray-300 text-gray-700 font-semibold hover:border-blue-400 hover:text-blue-600 transition" onclick="showPage('page-register')">注册新账号</button>
+                                <button class="w-full py-3 rounded-xl border border-transparent text-sm text-blue-600 hover:text-blue-700 transition" onclick="showPage('page-guest')">游客模式</button>
+                            </div>
+                            <div class="text-xs text-center text-gray-400">继续登录即表示同意 MotionStation《隐私政策》与《用户协议》</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 日常登录：账号选择 -->
+                <div id="page-auth-returning" class="page flex-col h-full bg-white">
+                    <div class="flex-shrink-0 h-12 flex items-center justify-between px-6 border-b">
+                        <button class="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1" onclick="showAuthLanding()">
+                            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path d="M12.707 15.707a1 1 0 01-1.414 0L6.586 11l4.707-4.707a1 1 0 10-1.414-1.414l-5.414 5.414a1 1 0 000 1.414l5.414 5.414a1 1 0 001.414 0z"/></svg>
+                            返回
+                        </button>
+                        <button class="text-sm text-blue-600 hover:text-blue-700" onclick="openRegionPicker()">切换地区</button>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-8 bg-gray-50">
+                        <div class="max-w-sm mx-auto space-y-6">
+                            <div>
+                                <h1 class="text-2xl font-bold text-gray-900 text-center">欢迎回来</h1>
+                                <p class="text-sm text-gray-500 text-center mt-2">选择上次登录的账号，或更换其他登录方式</p>
+                            </div>
+                            <div id="auth-last-login" class="hidden bg-white border border-blue-100 rounded-2xl shadow p-5 cursor-pointer hover:border-blue-300 transition"></div>
+                            <div id="auth-last-login-empty" class="bg-white border border-dashed border-gray-300 rounded-2xl p-5 text-sm text-gray-500">
+                                暂无历史登录记录，请选择其他登录方式。
+                            </div>
+                            <div class="space-y-3 pt-2">
+                                <button class="w-full py-3 rounded-xl border border-gray-300 text-gray-700 font-medium hover:border-blue-400 hover:text-blue-600 transition" onclick="startEmailLogin()">邮箱登录</button>
+                                <div class="flex items-center gap-2 text-xs text-gray-400">
+                                    <div class="flex-1 h-px bg-gray-200"></div>
+                                    <span>或</span>
+                                    <div class="flex-1 h-px bg-gray-200"></div>
+                                </div>
+                                <button class="w-full py-3 rounded-xl bg-blue-600 text-white font-semibold shadow hover:bg-blue-700 transition" onclick="startQrLogin()">扫码登录</button>
+                                <button class="w-full text-sm text-gray-500 hover:text-blue-600" onclick="showPage('page-login')">更多登录方式</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 登录页 -->
                 <div id="page-login" class="page flex-col p-8 h-full bg-white">
                     <h1 class="text-3xl font-bold text-gray-900 mt-4 mb-6">欢迎</h1>
@@ -1989,6 +2048,14 @@
             }
         };
 
+        const defaultAvatar = 'https://i.pravatar.cc/120?img=36';
+        let lastLoginProfile = {
+            nickname: '李雪',
+            account: 'lixue@example.com',
+            avatar: defaultAvatar,
+            lastLoginAt: new Date('2025-11-01T19:40:00')
+        };
+
         const accessoryOptions = ['健身凳', '折叠凳', '别腿凳', '手柄', '负重带', '杠铃', '核心床板', '双头弹簧', '双头绳', '引体向上杆', '红铃'];
 
         const settingsState = {
@@ -2327,6 +2394,100 @@
         let activationCountdownTimer = null;
 
 
+        function formatLastLoginLabel(date){
+            if (!date) return '上次登录：--';
+            const d = new Date(date);
+            if (Number.isNaN(d.getTime())) return '上次登录：--';
+            const now = new Date();
+            const options = { hour: '2-digit', minute: '2-digit', hour12: false };
+            const time = d.toLocaleTimeString('zh-CN', options);
+            const sameDay = d.toDateString() === now.toDateString();
+            if (sameDay) return `上次登录：今日 ${time}`;
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `上次登录：${month}月${day}日 ${time}`;
+        }
+
+        function renderLastLoginCard(){
+            const card = document.getElementById('auth-last-login');
+            const empty = document.getElementById('auth-last-login-empty');
+            if (!card || !empty) return;
+            if (!lastLoginProfile){
+                card.classList.add('hidden');
+                card.innerHTML = '';
+                empty.classList.remove('hidden');
+                return;
+            }
+            const avatar = lastLoginProfile.avatar || defaultAvatar;
+            const nickname = lastLoginProfile.nickname || 'Motion 用户';
+            const account = lastLoginProfile.account || 'motion@example.com';
+            card.classList.remove('hidden');
+            card.innerHTML = `
+                <div class="flex items-center gap-4">
+                    <img src="${avatar}" alt="用户头像" class="w-16 h-16 rounded-full object-cover shadow">
+                    <div class="flex-1 min-w-0">
+                        <div class="text-base font-semibold text-gray-900 truncate">${nickname}</div>
+                        <div class="text-xs text-gray-500 truncate">${account}</div>
+                        <div class="text-xs text-blue-500 mt-1">${formatLastLoginLabel(lastLoginProfile.lastLoginAt)}</div>
+                    </div>
+                    <svg class="w-5 h-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path d="M7.293 4.293a1 1 0 011.414 0L13 8.586a1 1 0 010 1.414l-4.293 4.293a1 1 0 01-1.414-1.414L10.586 10 7.293 6.707a1 1 0 010-1.414z"/></svg>
+                </div>`;
+            empty.classList.add('hidden');
+            card.onclick = loginWithLastProfile;
+        }
+
+        function showAuthLanding(){
+            showPage('page-auth-landing');
+        }
+
+        function openReturningLogin(){
+            renderLastLoginCard();
+            showPage('page-auth-returning');
+        }
+
+        function loginWithLastProfile(){
+            if (!lastLoginProfile){
+                startEmailLogin();
+                return;
+            }
+            lastLoginProfile.lastLoginAt = new Date();
+            renderLastLoginCard();
+            showToast(`欢迎回来，${lastLoginProfile.nickname || 'Motion 用户'}`);
+            showPage('page-home');
+            renderWeeklyCheckins('weekly-checkins-home');
+        }
+
+        function updateLastLoginProfileFromInputs(){
+            const emailInput = document.getElementById('login-email');
+            const phoneInput = document.getElementById('login-phone');
+            const email = emailInput?.value?.trim();
+            const phone = phoneInput?.value?.trim();
+            let nickname = '';
+            if (email) {
+                nickname = email.split('@')[0];
+            } else if (phone) {
+                nickname = `用户${phone.slice(-4)}`;
+            }
+            if (!nickname) nickname = 'Motion 用户';
+            const account = email || phone || (lastLoginProfile?.account) || 'motion@example.com';
+            lastLoginProfile = {
+                nickname,
+                account,
+                avatar: lastLoginProfile?.avatar || defaultAvatar,
+                lastLoginAt: new Date()
+            };
+            renderLastLoginCard();
+        }
+
+        function startEmailLogin(){
+            toggleLoginMode('email');
+            showPage('page-login');
+        }
+
+        function startQrLogin(){
+            openQrModal('login');
+        }
+
         function showPage(id) {
             if (currentPage) {
                 const oldPage = document.getElementById(currentPage);
@@ -2372,6 +2533,9 @@
                 if (id === 'page-training-share') {
                     populateTrainingShare();
                 }
+                if (id === 'page-auth-returning') {
+                    renderLastLoginCard();
+                }
             }
         }
 
@@ -2399,6 +2563,10 @@
         }
 
         function login() {
+            updateLastLoginProfileFromInputs();
+            lastLoginProfile.lastLoginAt = new Date();
+            renderLastLoginCard();
+            showToast(`欢迎回来，${lastLoginProfile.nickname || 'Motion 用户'}`);
             showPage('page-home');
             renderWeeklyCheckins('weekly-checkins-home');
             if (activationFlow) { showActivationSuccess(); activationFlow = false; }
@@ -3653,7 +3821,7 @@
 
         function requestFactoryReset(){ showToast('请确保备份数据后再执行（示意）'); }
 
-        function logout(){ showPage('page-login'); showToast('已退出登录'); }
+        function logout(){ showAuthLanding(); showToast('已退出登录'); }
 
         // 初始化
         document.addEventListener('DOMContentLoaded', () => {
@@ -3679,6 +3847,7 @@
             renderStandbyUI();
             renderAccessoryUI();
             renderPlanLibrary();
+            renderLastLoginCard();
             updateCacheBadge();
         });
 
